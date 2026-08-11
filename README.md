@@ -1,14 +1,10 @@
 # Skyseed Beet-Tracker
 
-Installierbare Web-App (PWA) zur Erfassung von Testsaaten in Skyseed-Hochbeeten.
-Zwei Beete, je 11 × 7 = 77 Felder im 10 × 10 cm Raster, adressiert `A1`–`G11` (`A1` hinten links).
+Installierbare Web-App (PWA) zur Erfassung von Testsaaten in Skyseed-Hochbeeten, inklusive
+Fotodokumentation je Feld. Zwei Beete, je 20 × 13 = 260 Felder im 5,5 × 5,5 cm Raster,
+adressiert `A1`–`M20` (`A1` hinten links).
 
-Live: https://skyseed-beet.netlify.app/
-
-> [!WARNING]
-> Der aktuell auf Netlify laufende Stand entspricht **nicht** dem Code in diesem Repo.
-> Details unter [Known Issues](CHANGELOG.md#-known-issues). Netlify bitte noch **nicht** mit
-> diesem Repo verbinden — sonst gehen die nur live vorhandenen Funktionen verloren.
+Gehostet über **GitHub Pages** — kein Netlify.
 
 ## Wie es funktioniert
 
@@ -16,52 +12,54 @@ Live: https://skyseed-beet.netlify.app/
 |---|---|
 | Frontend | Eine einzige `index.html` — inline CSS und JavaScript, keine Dependencies, kein Build |
 | Datenhaltung | Google Sheet, ein Tabellenblatt je Beet (`Beet 1`, `Beet 2`) |
+| Fotos | Google Drive, referenziert per Datei-ID im Sheet |
 | API | Google Apps Script Webapp (`doGet` / `doPost`) |
-| Hosting | Netlify, statische Auslieferung von `skyseed-beet-tracker/` |
+| Hosting | GitHub Pages, Deployment über GitHub Actions (`.github/workflows/deploy-pages.yml`) |
 
 Die App fragt den Serverstand alle 15 Sekunden ab und schreibt Änderungen sofort zurück.
-Fällt das Netz aus, zeigt sie den letzten lokal gespeicherten Stand weiter an; Speichern ist
-dann erst wieder online möglich.
+Fällt das Netz aus, zeigt sie den letzten lokal gespeicherten Stand weiter an (mit Zeitstempel);
+Speichern ist dann erst wieder online möglich.
 
 ## Bedienung
 
 - **Feld antippen** öffnet den Eintrags-Dialog.
-- **Schnell-Eintrag:** Raster-ID ins Eingabefeld tippen (`C5`) und Enter — springt direkt in
-  den Dialog, ohne im Raster suchen zu müssen.
+- **Schnell-Eintrag:** Raster-ID ins Eingabefeld tippen (`C5`, `M20`) und Enter — springt direkt
+  in den Dialog, ohne im Raster suchen zu müssen.
 - **Liste / Raster** schaltet zwischen Rasteransicht und chronologischer Liste um.
 - **CSV** exportiert das aktuell gewählte Beet.
-- **QR-Codes** erzeugt je Beet einen Code, der die App direkt mit dem richtigen Beet öffnet
-  (`?beet=1` bzw. `?beet=2`). Gedacht zum Ausdrucken und Anbringen am Beet.
-- Belegte Felder zeigen das Skyseed-Team-Kürzel der Baumart, z. B. `SKi` für Schwarzkiefer.
+- **Fotos:** im Dialog „+ Foto hinzufügen" — nimmt mit der Kamera auf oder wählt eine Datei,
+  lädt sie nach Google Drive hoch. Belegte Felder mit Fotos zeigen einen kleinen Zähler-Punkt.
+- Ein direkter Link mit `?beet=1` bzw. `?beet=2` öffnet die App gleich im richtigen Beet.
 - Vollständig per Tastatur bedienbar: Tab durch das Raster, Enter/Leertaste öffnet ein Feld,
-  Escape schließt Dialoge.
+  Escape schließt den Dialog.
 
 ## Lokal starten
 
 Kein Build, kein Server nötig — `skyseed-beet-tracker/index.html` im Browser öffnen genügt.
 
-Zwei Einschränkungen bei `file://`: Service Worker und PWA-Installation funktionieren nicht
-(beides verlangt http/https), und die QR-Codes werden ausgeblendet, weil eine lokale Datei-URL
-als QR-Code nutzlos wäre. Wer das mittesten will, braucht einen lokalen Webserver, z. B.:
+Einzige Einschränkung bei `file://`: Service Worker und PWA-Installation funktionieren nicht
+(beides verlangt http/https). Wer das mittesten will, braucht einen lokalen Webserver, z. B.:
 
 ```bash
 npx serve skyseed-beet-tracker
 ```
 
-## Deployment auf Netlify
+## Hosting auf GitHub Pages
 
-Beim Verbinden dieses Repos in Netlify:
+Kein separater Hosting-Account nötig. Einrichtung einmalig:
 
-| Einstellung | Wert |
-|---|---|
-| Base directory | *(leer)* |
-| Build command | *(leer — es gibt keinen Build)* |
-| Publish directory | `skyseed-beet-tracker` |
+1. **Settings → Pages → Source: GitHub Actions** im Repo aktivieren.
+2. Push auf `main` mit Änderungen unter `skyseed-beet-tracker/**` löst
+   `.github/workflows/deploy-pages.yml` automatisch aus.
+3. Die URL steht danach unter **Settings → Pages** bzw. im Workflow-Run als `page_url`.
 
-> [!IMPORTANT]
-> Für `service-worker.js` sollte Netlify `Cache-Control: no-cache` senden. Ohne das kann ein
-> Browser den Service Worker selbst aus dem Cache bedienen und neue Versionen erreichen
-> installierte Geräte nie. Aktuell ist das **nicht** konfiguriert.
+Es gibt keine Build-Pipeline — der Workflow lädt den Ordner `skyseed-beet-tracker/` unverändert
+als Pages-Artefakt hoch (`actions/upload-pages-artifact` + `actions/deploy-pages`).
+
+> [!NOTE]
+> GitHub Pages liefert das Repo typischerweise unter einem Unterpfad
+> (`https://<user>.github.io/skyseed-beet-tracker/`), nicht unter einer eigenen Domain wie bei
+> Netlify. Alle Pfade in der App sind relativ und funktionieren damit ohne Anpassung.
 
 ## Backend einrichten
 
@@ -73,16 +71,25 @@ Vollständige Schritt-für-Schritt-Anleitung steht im Kopfkommentar von
 3. **Bereitstellen → Neue Bereitstellung** → Typ *Web-App*, Ausführen als *Ich*,
    Zugriff *Jeder*
 4. Die erzeugte URL in `skyseed-beet-tracker/index.html` bei `const API_URL = …` einsetzen
-5. Für wöchentliche Backups einen Zeit-Trigger auf `weeklyBackup` einrichten (Sonntag, 3–4 Uhr).
+5. Beim ersten Foto-Upload fragt Google nach Drive-Zugriff — einmalig bestätigen
+   (Berechtigung des Deployment-Besitzers, nicht der einzelnen Nutzer:innen)
+6. Für wöchentliche Backups einen Zeit-Trigger auf `weeklyBackup` einrichten (Sonntag, 3–4 Uhr).
    Backups bleiben 8 Wochen erhalten, ältere werden automatisch entfernt.
+
+> [!IMPORTANT]
+> `apps-script.gs` in diesem Repo ist eine **Referenz-Implementierung**, abgeleitet aus dem
+> API-Vertrag, den die App tatsächlich nutzt (`upsert` / `delete` / `uploadFoto` /
+> `deleteFoto`). Läuft bereits ein Deployment hinter der aktuellen `API_URL`, dieses hier
+> **nicht blind drüberkopieren** — dessen Quellcode ist über HTTP nicht einsehbar und könnte
+> ein anderes Sheet-Layout oder andere Foto-Ablage verwenden. Vorher im Apps-Script-Editor
+> vergleichen.
 
 ### Spalten im Google Sheet
 
-`Raster-ID` · `Baumart` · `Benutzer` · `Postennummer` · `Datum` · `Kommentar` · `Updated`
+`Raster-ID` · `Baumart` · `Postennummer` · `Datum` · `Kommentar` · `Fotos` (JSON-Array) ·
+`Updated`
 
-Die Reihenfolge ist bindend — `doGet` liest die Spalten positionsbasiert. Wird im Sheet eine
-Spalte eingefügt oder verschoben, liest die App die Felder falsch aus, ohne einen Fehler zu
-melden.
+Die Reihenfolge ist bindend — `doGet` liest die Spalten positionsbasiert.
 
 ## Zugriff und Vertraulichkeit
 

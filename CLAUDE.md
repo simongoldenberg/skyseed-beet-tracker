@@ -10,9 +10,12 @@
 ## Was ist das Projekt?
 
 Eine installierbare Web-App (PWA), mit der im Feld erfasst wird, welche Baumart in welchem
-Feld eines Skyseed-Hochbeets ausgesät wurde. Zwei Beete, je ein Raster von 11 × 7 = 77 Feldern
-(10 × 10 cm), adressiert als `A1` bis `G11` — `A1` liegt hinten links. Die Daten liegen in einem
-Google Sheet, angebunden über ein Google-Apps-Script-Webapp.
+Feld eines Skyseed-Hochbeets ausgesät wurde — inklusive Fotodokumentation je Feld. Zwei Beete,
+je ein Raster von 20 × 13 = 260 Feldern (5,5 × 5,5 cm), adressiert als `A1` bis `M20` — `A1`
+liegt hinten links. Die Daten liegen in einem Google Sheet, angebunden über ein
+Google-Apps-Script-Webapp; Fotos landen in Google Drive.
+
+Gehostet wird ausschließlich über **GitHub Pages** — kein Netlify, kein anderer Hoster.
 
 ## Architektur-Constraints
 
@@ -20,28 +23,34 @@ Diese Punkte sind bewusst so und sollten nicht ohne Rücksprache aufgeweicht wer
 
 - **Kein Build-Tool, kein npm.** Die gesamte App ist eine einzige `index.html` mit inline CSS
   und inline JavaScript. Es gibt keinen Bundler, keinen Transpiler, keine Dependencies.
-- **Deployment = Dateien kopieren.** Netlify liefert das Verzeichnis `skyseed-beet-tracker/`
-  statisch aus. Es gibt keinen Build-Schritt.
+- **Deployment = Dateien kopieren.** Ein GitHub-Actions-Workflow lädt `skyseed-beet-tracker/`
+  unverändert als Pages-Artefakt hoch — keine Build-Pipeline, kein Kompilierschritt.
 - **Backend ist Google Apps Script.** `apps-script.gs` wird nicht deployt, sondern manuell in
-  den Apps-Script-Editor des Google Sheets eingefügt (siehe Kopfkommentar in der Datei).
+  den Apps-Script-Editor des Google Sheets eingefügt (siehe Kopfkommentar in der Datei). Es ist
+  eine **Referenz-Implementierung**, die zum Vertrag der Frontend-Aktionen passt
+  (`upsert` / `delete` / `uploadFoto` / `deleteFoto`) — vor dem Überschreiben eines bereits
+  laufenden Deployments unbedingt mit dessen Code abgleichen.
 - **Kein Auth.** Das Apps-Script-Webapp läuft mit Zugriff „Jeder, ohne Anmeldung". Wer die URL
   kennt, kann das Sheet lesen und schreiben. Deshalb ist das Repo privat.
 - **Relative Pfade.** Manifest, Icons und Service Worker werden relativ (`./`) eingebunden,
-  damit die App auch in einem Unterverzeichnis funktioniert.
+  damit die App auch unter einem GitHub-Pages-Unterpfad (`/skyseed-beet-tracker/`) funktioniert.
+- **Keine QR-Codes.** Die Beet-Zuordnung ist im Feld eindeutig, ein QR-Feature wurde bewusst
+  nicht (mehr) eingebaut.
 
 ## Dateistruktur
 
 ```
 .
-├── skyseed-beet-tracker/        ← das, was Netlify ausliefert (Publish-Verzeichnis)
+├── .github/workflows/
+│   └── deploy-pages.yml         ← lädt skyseed-beet-tracker/ als GitHub-Pages-Artefakt hoch
+├── skyseed-beet-tracker/        ← das, was GitHub Pages ausliefert
 │   ├── index.html               ← die komplette App: CSS, HTML, JS, Baumartenliste
 │   ├── manifest.json            ← PWA-Metadaten (Name, Farben, Icons)
-│   ├── service-worker.js        ← Offline-Cache für die statischen Dateien
+│   ├── service-worker.js        ← Offline-Cache für statische Dateien + Foto-Thumbnails
 │   ├── icon-192.png
 │   ├── icon-512.png
 │   └── icon-maskable-512.png
-├── apps-script.gs               ← Backend, manuell ins Google Sheet einzufügen
-├── deployed-snapshot/           ← Sicherung des abweichenden Netlify-Livestands
+├── apps-script.gs               ← Backend-Referenz, manuell ins Google Sheet einzufügen
 ├── CHANGELOG.md
 ├── README.md
 └── CLAUDE.md
@@ -59,13 +68,14 @@ Diese Punkte sind bewusst so und sollten nicht ohne Rücksprache aufgeweicht wer
 
 | Was du ändern willst | Wo das hingehört |
 |---|---|
-| Neue Baumart, Kürzel ändern | `BAUMARTEN` in `index.html` — **einzige** Datenquelle, Dropdown und Kürzel entstehen daraus |
+| Baumartenliste | `<select id="f-baumart">` in `index.html` — direkt als `<option>`-Einträge, keine separate Datenquelle |
 | Neues Eingabefeld im Modal | `index.html`: Feld im Modal-Markup, Auslesen in `saveEntry()`, Vorbelegen in `openModal()`, Spalte in `HEADER` (`apps-script.gs`), Spalte im CSV-Export |
-| Neue Benutzer-Kürzel | `<select id="f-benutzer">` in `index.html` |
-| Sync-/Timeout-Verhalten | Konstanten `POLL_INTERVAL`, `FETCH_TIMEOUT`, `SAVE_TIMEOUT` in `index.html` |
+| Sync-/Timeout-Verhalten | Konstanten `POLL_INTERVAL`, `FETCH_TIMEOUT`, `SAVE_TIMEOUT`, `UPLOAD_TIMEOUT` in `index.html` |
+| Foto-Ablage (Drive-Ordner, Sharing) | `getOrCreatePhotoFolder()` / `handleUploadFoto()` in `apps-script.gs` |
 | Backend-Logik, Backups | `apps-script.gs` — danach im Apps-Script-Editor neu bereitstellen |
+| Hosting/Deployment | `.github/workflows/deploy-pages.yml` |
 
-**Beim Hinzufügen eines Feldes an alle fünf Stellen denken** — Markup, `openModal()`,
+**Beim Hinzufügen eines Feldes an alle Stellen denken** — Markup, `openModal()`,
 `saveEntry()`, `HEADER` im Apps Script und `exportCSV()`. Vergisst man das Apps Script,
 landen die Daten still im Nichts.
 
@@ -74,11 +84,27 @@ landen die Daten still im Nichts.
 Rasterzellen und Listeneinträge sind bewusst `<button>`-Elemente, nicht `<div>`s — nur so
 funktionieren Tastaturbedienung und Screenreader. Wer sie zurück auf `div` ändert, muss die
 globalen `button`-Regeln in `.cell` / `.list-entry` nicht mehr zurücksetzen, bricht aber die
-Bedienbarkeit. Die Dialoge halten den Fokus über `openOverlay()` / `closeOverlay()`.
+Bedienbarkeit. Der Eintrags-Dialog hält den Fokus (Tab-Trap) und gibt ihn beim Schließen an das
+ursprüngliche Element zurück.
 
-## Offener Punkt: Livestand weicht ab
+## Hosting: GitHub Pages statt Netlify
 
-Der auf Netlify laufende Stand und der Code in diesem Repo sind **auseinandergelaufen** — siehe
-den Abschnitt „Known Issues" im [CHANGELOG.md](CHANGELOG.md). Vor dem nächsten Deployment muss
-das zusammengeführt werden, sonst gehen Funktionen verloren. Netlify daher **noch nicht** mit
-diesem Repo verbinden.
+`.github/workflows/deploy-pages.yml` läuft bei jedem Push auf `main`, der
+`skyseed-beet-tracker/**` betrifft, und veröffentlicht den Ordner unverändert über die
+offizielle Pages-Action (`actions/upload-pages-artifact` + `actions/deploy-pages`) — keine
+Build-Pipeline, nur ein Artefakt-Upload. Repo-Einstellung: **Settings → Pages → Source: GitHub
+Actions**.
+
+Die App liegt danach voraussichtlich unter einem Unterpfad
+(`https://simongoldenberg.github.io/skyseed-beet-tracker/`), nicht unter einer eigenen Domain
+wie bei Netlify. Alle Pfade in `index.html`/`manifest.json`/`service-worker.js` sind relativ,
+das funktioniert unter einem Unterpfad ohne Anpassung.
+
+## Bekannte Baustelle: Fotos ohne Backend-Verifikation
+
+`apps-script.gs` implementiert die Aktionen `uploadFoto` und `deleteFoto` (Ablage in einem
+Drive-Ordner „Skyseed Beet-Tracker Fotos", Freigabe „Jeder mit Link"), abgeleitet aus dem
+Vertrag, den `index.html` an die API stellt. Das ist **nicht** gegen den tatsächlich hinter der
+aktuellen `API_URL` laufenden Code getestet — dessen Quellcode ist über HTTP nicht einsehbar.
+Vor einem Redeploy dieser Datei über ein bereits produktiv laufendes Script: im Apps-Script-
+Editor vergleichen.

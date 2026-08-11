@@ -2,7 +2,15 @@
  * Beet-Tracker Backend — Google Apps Script
  * ==========================================
  *
- * Installation:
+ * Referenz-Implementierung, abgestimmt auf den Vertrag, den
+ * skyseed-beet-tracker/index.html an die API stellt (Aktionen upsert /
+ * delete / uploadFoto / deleteFoto). Läuft bereits ein Apps-Script-Deployment
+ * hinter der in index.html hinterlegten API_URL, dieses hier NICHT blind
+ * drüberkopieren — vorher im Apps-Script-Editor des zugehörigen Google
+ * Sheets vergleichen, sonst drohen Datenverlust oder ein anderes Spalten-
+ * layout im Sheet.
+ *
+ * Installation (neues Sheet / neue Instanz):
  * 1. Google Sheet anlegen ("Skyseed Beet-Tracker")
  * 2. Erweiterungen → Apps Script
  * 3. Code.gs löschen, diesen Code komplett einfügen, speichern (Strg+S)
@@ -13,7 +21,10 @@
  *    - Bereitstellen → URL kopieren
  * 5. URL in skyseed-beet-tracker/index.html oben im <script>-Block
  *    bei `const API_URL = ...` einsetzen
- * 6. Für Backups: Symbol "Trigger" (Uhr) in der linken Leiste
+ * 6. Beim ersten Foto-Upload fragt Google nach Drive-Zugriff (für die
+ *    Fotoablage) — das ist die "Ausführen als"-Berechtigung des Deployment-
+ *    Besitzers, nicht der einzelnen Nutzer:innen. Einmal bestätigen.
+ * 7. Für Backups: Symbol "Trigger" (Uhr) in der linken Leiste
  *    - Trigger hinzufügen
  *    - Funktion: weeklyBackup
  *    - Ereignisquelle: Zeitgesteuert
@@ -21,13 +32,11 @@
  *    - Wochentag: Sonntag
  *    - Uhrzeit: 03:00–04:00
  *    - Speichern
- *
- * Beim ersten Aufruf der Funktion fragt Google nach Berechtigungen.
- * Einmal bestätigen, danach läuft alles automatisch.
  */
 
 const BEET_SHEETS = { '1': 'Beet 1', '2': 'Beet 2' };
-const HEADER = ['Raster-ID', 'Baumart', 'Benutzer', 'Postennummer', 'Datum', 'Kommentar', 'Updated'];
+const HEADER = ['Raster-ID', 'Baumart', 'Postennummer', 'Datum', 'Kommentar', 'Fotos', 'Updated'];
+const PHOTO_FOLDER_NAME = 'Skyseed Beet-Tracker Fotos';
 const BACKUP_PREFIX = 'Backup_';
 const BACKUP_WEEKS_TO_KEEP = 8;
 
@@ -42,14 +51,14 @@ function doGet(e) {
     const data = sheet.getDataRange().getValues();
     const entries = {};
     for (let i = 1; i < data.length; i++) {
-      const [id, baumart, benutzer, posten, datum, kommentar, updated] = data[i];
+      const [id, baumart, posten, datum, kommentar, fotosRaw, updated] = data[i];
       if (!id) continue;
       entries[String(id)] = {
         baumart: String(baumart || ''),
-        benutzer: String(benutzer || ''),
         posten: String(posten || ''),
         datum: formatDate(datum),
         kommentar: String(kommentar || ''),
+        fotos: parseFotos(fotosRaw),
         updated: formatISO(updated)
       };
     }
@@ -59,66 +68,127 @@ function doGet(e) {
   }
 }
 
-/* ============ POST: Einträge anlegen/updaten/löschen ============ */
+/* ============ POST: Einträge anlegen/updaten/löschen, Fotos hoch-/runterladen ============ */
 function doPost(e) {
-  // Schreibzugriffe werden serialisiert. Ohne Sperre koennen zwei gleichzeitige
-  // Eintraege dieselbe Raster-ID doppelt anlegen oder sich gegenseitig
-  // ueberschreiben: beide lesen den Bestand, finden die Zeile nicht und haengen
-  // je eine neue an. Im Feld tippen mehrere Leute parallel — das passiert real.
-  const lock = LockService.getScriptLock();
-  if (!lock.tryLock(20000)) {
-    return json({ error: 'Server gerade beschäftigt — bitte erneut speichern' });
-  }
   try {
     const body = JSON.parse(e.postData.contents);
+
+    // Foto-Aktionen greifen nicht auf das Sheet zu — kein Schreib-Lock nötig,
+    // damit ein langsamer Upload keine parallelen Sheet-Schreibvorgänge blockiert.
+    if (body.action === 'uploadFoto') return handleUploadFoto(body);
+    if (body.action === 'deleteFoto') return handleDeleteFoto(body);
+
     const beet = String(body.beet || '1');
     const sheetName = BEET_SHEETS[beet];
     if (!sheetName) return json({ error: 'invalid beet' });
 
-    const sheet = getOrCreateSheet(sheetName);
+    // Schreibzugriffe auf das Sheet werden serialisiert. Ohne Sperre koennen
+    // zwei gleichzeitige Eintraege dieselbe Raster-ID doppelt anlegen oder
+    // sich gegenseitig ueberschreiben: beide lesen den Bestand, finden die
+    // Zeile nicht und haengen je eine neue an. Im Feld tippen mehrere Leute
+    // parallel — das passiert real.
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(20000)) {
+      return json({ error: 'Server gerade beschäftigt — bitte erneut speichern' });
+    }
+    try {
+      const sheet = getOrCreateSheet(sheetName);
 
-    if (body.action === 'delete') {
-      const data = sheet.getDataRange().getValues();
-      for (let i = 1; i < data.length; i++) {
-        if (String(data[i][0]) === String(body.id)) {
-          sheet.deleteRow(i + 1);
-          break;
+      if (body.action === 'delete') {
+        const data = sheet.getDataRange().getValues();
+        for (let i = 1; i < data.length; i++) {
+          if (String(data[i][0]) === String(body.id)) {
+            sheet.deleteRow(i + 1);
+            break;
+          }
         }
+        SpreadsheetApp.flush();
+        return json({ ok: true, action: 'delete', id: body.id });
       }
+
+      // upsert (default)
+      const now = new Date();
+      const row = [
+        String(body.id || ''),
+        String(body.baumart || ''),
+        String(body.posten || ''),
+        body.datum || '',
+        String(body.kommentar || ''),
+        JSON.stringify(body.fotos || []),
+        now
+      ];
+
+      const data = sheet.getDataRange().getValues();
+      let rowIndex = -1;
+      for (let i = 1; i < data.length; i++) {
+        if (String(data[i][0]) === String(body.id)) { rowIndex = i + 1; break; }
+      }
+      if (rowIndex > 0) {
+        sheet.getRange(rowIndex, 1, 1, HEADER.length).setValues([row]);
+      } else {
+        sheet.appendRow(row);
+      }
+      // Schreiben erzwingen, bevor die Sperre faellt — sonst kann der
+      // naechste Request noch den alten Bestand lesen.
       SpreadsheetApp.flush();
-      return json({ ok: true, action: 'delete', id: body.id });
+      return json({ ok: true, action: 'upsert', id: body.id, updated: formatISO(now) });
+    } finally {
+      lock.releaseLock();
     }
-
-    // upsert (default)
-    const now = new Date();
-    const row = [
-      String(body.id || ''),
-      String(body.baumart || ''),
-      String(body.benutzer || ''),
-      String(body.posten || ''),
-      body.datum || '',
-      String(body.kommentar || ''),
-      now
-    ];
-
-    const data = sheet.getDataRange().getValues();
-    let rowIndex = -1;
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === String(body.id)) { rowIndex = i + 1; break; }
-    }
-    if (rowIndex > 0) {
-      sheet.getRange(rowIndex, 1, 1, HEADER.length).setValues([row]);
-    } else {
-      sheet.appendRow(row);
-    }
-    // Schreiben erzwingen, bevor die Sperre faellt — sonst kann der naechste
-    // Request noch den alten Bestand lesen.
-    SpreadsheetApp.flush();
-    return json({ ok: true, action: 'upsert', id: body.id, updated: formatISO(now) });
   } catch (err) {
     return json({ error: String(err) });
-  } finally {
-    lock.releaseLock();
+  }
+}
+
+/* ============ Fotos: Ablage in Google Drive ============ */
+function handleUploadFoto(body) {
+  try {
+    const folder = getOrCreatePhotoFolder();
+    const bytes = Utilities.base64Decode(body.fileBase64);
+    const mimeType = body.mimeType || 'image/jpeg';
+    const filename = 'Beet' + '_' + (body.id || 'feld') + '_' + Date.now();
+    const blob = Utilities.newBlob(bytes, mimeType, filename);
+    const file = folder.createFile(blob);
+    // Ohne oeffentlichen Link-Zugriff kann der <img>-Tag im Browser das
+    // Thumbnail nicht ohne Google-Anmeldung laden.
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const fileId = file.getId();
+    return json({
+      ok: true,
+      fileId: fileId,
+      url: 'https://drive.google.com/file/d/' + fileId + '/view',
+      thumbnailUrl: 'https://drive.google.com/thumbnail?id=' + fileId + '&sz=w400',
+      datum: body.datum || ''
+    });
+  } catch (err) {
+    return json({ error: String(err) });
+  }
+}
+
+function handleDeleteFoto(body) {
+  try {
+    if (body.fileId) {
+      DriveApp.getFileById(body.fileId).setTrashed(true);
+    }
+    return json({ ok: true, action: 'deleteFoto', fileId: body.fileId });
+  } catch (err) {
+    return json({ error: String(err) });
+  }
+}
+
+function getOrCreatePhotoFolder() {
+  const existing = DriveApp.getFoldersByName(PHOTO_FOLDER_NAME);
+  if (existing.hasNext()) return existing.next();
+  return DriveApp.createFolder(PHOTO_FOLDER_NAME);
+}
+
+function parseFotos(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
   }
 }
 

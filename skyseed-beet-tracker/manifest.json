@@ -1,11 +1,11 @@
 {
   "name": "Skyseed Beet-Tracker",
   "short_name": "Beet-Tracker",
-  "description": "Testsaat-Tracker für Skyseed-Hochbeete mit 10×10 cm Netz-Raster",
+  "description": "Hochbeet-Tracker für Skyseed-Forstanzucht. Raster 20×13, mit Foto-Funktion.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "background_color": "#f4f0e6",
   "theme_color": "#2d4a23",
   "lang": "de",

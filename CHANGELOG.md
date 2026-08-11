@@ -2,7 +2,81 @@
 
 Alle nennenswerten Änderungen am Skyseed Beet-Tracker.
 
-## Version 2.0.0 — 2026-08-11
+## Version 3.0.0 — 2026-08-11
+
+**[BREAKING]** Ersetzt die in v2.0.0 unter Versionskontrolle gebrachte Version vollständig durch
+den tatsächlich produktiv laufenden Stand (per Netlify-Deploy-Export bereitgestellt) und
+migriert das Hosting von Netlify auf GitHub Pages.
+
+Der in v2.0.0 dokumentierte „Known Issues"-Verdacht — Repo-Stand und Netlify-Livestand liefen
+auseinander — hat sich bestätigt: v2.0.0 basierte auf einer veralteten, nie live gegangenen
+Zwischenversion (77-Felder-Raster, Felder „Benutzer" und eigene Baumarten, kein Foto-Feature).
+Der echte Produktivstand hat ein 260-Felder-Raster und eine Fotodokumentation je Feld, aber
+weder „Benutzer" noch eigene Baumarten. Diese Version übernimmt den echten Stand als neue
+Grundlage.
+
+### 💥 Breaking Changes
+- **Rastergröße:** 20 × 13 = 260 Felder (5,5 × 5,5 cm) statt 11 × 7 = 77 Felder (10 × 10 cm).
+  Quick-Eintrag-Muster jetzt `A1`–`M20` statt `A1`–`G11`.
+- **Feld „Benutzer" entfernt** — existierte nur in der veralteten Zwischenversion, nie in
+  Produktion.
+- **Eigene Baumarten (Hinzufügen/Verwalten) entfernt** — ebenfalls nur in der veralteten
+  Zwischenversion. Die Baumartenliste ist jetzt fest im Dropdown hinterlegt, mit einer
+  Sammelkategorie „Andere / Freitext" für Sonderfälle.
+- **Kürzel-Tabelle entfernt.** Die Rasterzelle zeigt jetzt den ersten Namensteil vor der
+  Klammer, gekürzt auf 4 Zeichen (z. B. „Fich…" für „Fichte (Picea abies)") — abgeleitet aus
+  einer einzigen Funktion (`kurzLabel()`), keine separate Kürzel-Liste mehr zu pflegen.
+- **`API_URL` geändert** auf die tatsächlich produktiv genutzte Apps-Script-Bereitstellung.
+- **Sheet-Spaltenlayout geändert:** `Raster-ID · Baumart · Postennummer · Datum · Kommentar ·
+  Fotos · Updated` (keine `Benutzer`-Spalte mehr, neue `Fotos`-Spalte als JSON-Array).
+
+### 🚀 Added
+- **Fotodokumentation je Feld.** Kameraaufnahme oder Dateiauswahl, Upload nach Google Drive,
+  Datum je Foto editierbar, Vorschaubild, Zähler-Punkt auf belegten Rasterzellen.
+- **Hosting über GitHub Pages** statt Netlify — `.github/workflows/deploy-pages.yml` lädt
+  `skyseed-beet-tracker/` bei jedem Push auf `main` unverändert als Pages-Artefakt hoch, keine
+  Build-Pipeline.
+- **Backend-Aktionen `uploadFoto` / `deleteFoto`** in `apps-script.gs` — legt Fotos in einem
+  Drive-Ordner „Skyseed Beet-Tracker Fotos" ab, mit Freigabe „Jeder mit Link" für die
+  Thumbnail-Anzeige im Browser.
+- Alle Robustheits- und Barrierefreiheits-Verbesserungen aus v2.0.0 wurden auf den echten
+  Produktivstand übertragen: lokaler Zwischenspeicher der Einträge in `localStorage` mit
+  sichtbarem Zeitstempel bei Offline-Anzeige, Zeitgrenzen für Server-Requests (12 s lesend,
+  20 s schreibend, 60 s für Foto-Uploads), echte `<button>`-Rasterzellen/-Listeneinträge mit
+  sprechender Beschriftung, Fokus-Halt und -Rückgabe im Eintrags-Dialog, kein Hintergrund-
+  Polling, Beet-Pinning beim Speichern, `LockService` + `flush()` im Backend für Sheet-Schreib-
+  vorgänge (nicht für Foto-Uploads — die brauchen kein Sheet-Lock und sollen parallele
+  Sheet-Schreibvorgänge nicht blockieren).
+
+### 🔄 Changed
+- **QR-Codes entfernt.** Die Beet-Zuordnung ist im Feld eindeutig, das Feature war überflüssig.
+  Der direkte Link mit `?beet=1`/`?beet=2` bleibt erhalten (z. B. für Lesezeichen), nur die
+  QR-Bild-Erzeugung und der zugehörige Dialog sind weg.
+- `CACHE_VERSION` des Service Workers auf `skyseed-beet-v4` erhöht.
+- Icons durch die tatsächlich produktiv genutzten Dateien ersetzt (weichen leicht von den
+  vorherigen ab).
+
+### 🐛 Fixed
+- `apps-script.gs` implementierte `uploadFoto`/`deleteFoto` nicht und wäre bei diesen Aktionen
+  stillschweigend in den `upsert`-Standardfall gefallen — hätte bei einer frischen Bereitstellung
+  falsche Zeilen ins Sheet geschrieben. Jetzt beide Aktionen als Referenz-Implementierung
+  vorhanden (siehe Hinweis unten).
+
+> [!CAUTION]
+> ### 🐙 Known Issues
+>
+> **`apps-script.gs` ist eine Referenz-Implementierung, nicht der verifizierte Produktivcode.**
+> Die Aktionen `uploadFoto`/`deleteFoto` wurden aus dem Vertrag abgeleitet, den `index.html`
+> tatsächlich an die API stellt — der Quellcode des bereits hinter `API_URL` laufenden Scripts
+> ist über HTTP nicht einsehbar und wurde daher nicht 1:1 übernommen. Vor einem Redeploy dieser
+> Datei über ein bereits produktiv laufendes Script: im Apps-Script-Editor vergleichen, sonst
+> drohen ein abweichendes Sheet-Layout oder eine andere Foto-Ablage.
+>
+> **Datenkontinuität ungeklärt:** Diese Version zeigt bei `?beet=1`/`?beet=2` die Daten hinter
+> der neuen `API_URL`. Ob und wie das vorher im Repo hinterlegte, andere Sheet (siehe v2.0.0)
+> weiterverwendet werden soll, ist offen.
+
+## Version 2.0.0 — 2026-08-11 *(überholt, siehe v3.0.0)*
 
 Erste Version unter Versionskontrolle. Der bestehende Stand wurde übernommen und um
 Robustheit, Barrierefreiheit und eine zentrale Baumartenliste erweitert.
