@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, user-scalable=yes, viewport-fit=cover">
+<meta name="theme-color" content="#2d4a23">
+<meta name="description" content="Skyseed Beet-Tracker">
+<title>Skyseed Beet-Tracker</title>
+
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Beet-Tracker">
+<meta name="mobile-web-app-capable" content="yes">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f4f0e6;
+    --bg-2: #ebe5d3;
+    --bg-3: #e0d8bf;
+    --ink: #2a2118;
+    --ink-muted: #6b5f4e;
+    --line: #c9bfa7;
+    --accent: #4a6b3a;
+    --accent-dark: #2d4a23;
+    --accent-2: #8aa378;
+    --warn: #a04b2a;
+    --sync-ok: #4a6b3a;
+    --sync-wait: #c99a3a;
+    --sync-err: #a04b2a;
+    --empty: #e3dcc6;
+    --empty-alt: #d8cfb1;
+    --filled: #a8c48f;
+    --filled-border: #6b8a52;
+    --safe-top: env(safe-area-inset-top, 0);
+    --safe-bottom: env(safe-area-inset-bottom, 0);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+    overscroll-behavior: none;
+  }
+  body {
+    padding: calc(14px + var(--safe-top)) 14px calc(76px + var(--safe-bottom));
+    max-width: 920px;
+    margin: 0 auto;
+    min-height: 100vh;
+  }
+  h1, h2 { font-family: 'Fraunces', Georgia, serif; font-weight: 600; letter-spacing: -0.01em; }
+  header { margin-bottom: 12px; padding-bottom: 10px; border-bottom: 2px solid var(--ink); }
+  h1 { font-size: clamp(22px, 5.5vw, 30px); font-style: italic; line-height: 1.1; }
+  .subtitle { color: var(--ink-muted); font-size: 11px; margin-top: 5px; letter-spacing: 0.02em; }
+
+  .beet-bar { display: flex; gap: 0; margin-bottom: 12px; border: 1.5px solid var(--ink); }
+  .beet-tab {
+    flex: 1; padding: 14px 10px; background: var(--bg); color: var(--ink); cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; border: none; border-right: 1.5px solid var(--ink); transition: all 0.15s;
+  }
+  .beet-tab:last-child { border-right: none; }
+  .beet-tab.active { background: var(--ink); color: var(--bg); }
+  .beet-tab:not(.active):hover { background: var(--bg-2); }
+
+  .sync-row {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-muted);
+    gap: 8px;
+  }
+  .sync-status { display: flex; align-items: center; gap: 6px; }
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sync-ok); flex-shrink: 0; }
+  .sync-dot.wait { background: var(--sync-wait); animation: pulse 1s infinite; }
+  .sync-dot.err { background: var(--sync-err); }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .stats strong { color: var(--ink); font-weight: 700; font-size: 13px; }
+
+  .quick-bar { display: flex; gap: 6px; margin-bottom: 10px; }
+  .quick-bar input {
+    flex: 1; padding: 11px 14px; font-family: inherit; font-size: 15px; font-weight: 500;
+    text-transform: uppercase; border: 1.5px solid var(--line); background: var(--bg);
+    color: var(--ink); border-radius: 0; letter-spacing: 0.05em;
+  }
+  .quick-bar input:focus { outline: none; border-color: var(--accent); background: var(--bg-2); }
+  .quick-bar input.invalid { border-color: var(--warn); }
+
+  .toolbar { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  button {
+    font-family: inherit; font-size: 12px; font-weight: 500; padding: 9px 13px;
+    border: 1.5px solid var(--ink); background: var(--bg); color: var(--ink); cursor: pointer;
+    border-radius: 0; transition: all 0.12s ease; letter-spacing: 0.03em;
+    text-transform: uppercase; white-space: nowrap;
+  }
+  button:active { transform: translateY(1px); }
+  button:hover { background: var(--ink); color: var(--bg); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  button.primary:hover { background: var(--ink); border-color: var(--ink); }
+  button.danger { border-color: var(--warn); color: var(--warn); }
+  button.danger:hover { background: var(--warn); color: var(--bg); }
+  button.install { background: var(--accent-dark); border-color: var(--accent-dark); color: var(--bg); }
+
+  .grid-wrap {
+    background: var(--bg-2); padding: 14px; border: 1px solid var(--line);
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+  }
+  .grid {
+    display: grid; grid-template-columns: 30px repeat(20, minmax(34px, 1fr));
+    gap: 3px; width: 100%; max-width: 720px; margin: 0 auto;
+  }
+  .grid-corner, .grid-ch, .grid-rh {
+    font-size: 10px; font-weight: 600; color: var(--ink-muted);
+    display: flex; align-items: center; justify-content: center; user-select: none;
+  }
+  .grid-ch { height: 32px; }
+  .grid-rh { height: 34px; }
+  .grid-ch.fifth, .grid-rh.fifth { color: var(--warn); }
+
+  .cell {
+    aspect-ratio: 1; min-height: 34px; background: var(--empty);
+    border: 1px solid transparent; cursor: pointer; color: var(--ink-muted);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    transition: all 0.1s; font-weight: 500; overflow: hidden; padding: 3px;
+    text-align: center; line-height: 1.15;
+  }
+  .cell.alt:not(.filled) { background: var(--empty-alt); }
+  .cell { position: relative; }
+  .foto-indicator {
+    position: absolute; top: 1px; right: 2px;
+    background: var(--warn); color: var(--bg);
+    font-size: 7px; font-weight: 700;
+    width: 10px; height: 10px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    line-height: 1;
+  }
+  .cell:hover { border-color: var(--ink); }
+  .cell:active { transform: scale(0.96); }
+  .cell .cid { font-size: 9px; font-weight: 600; opacity: 0.75; }
+  .cell .cbaum {
+    font-size: 9px; font-weight: 700; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; max-width: 100%; margin-top: 1px;
+  }
+  .cell.filled {
+    background: var(--filled);
+    color: var(--ink);
+    border-color: var(--filled-border);
+  }
+  .cell.filled .cid { opacity: 0.6; }
+  .cell.filled:hover { background: var(--accent-2); border-color: var(--accent); }
+  .cell.recent { box-shadow: inset 0 0 0 2.5px var(--warn); }
+
+  .legend {
+    display: flex; gap: 14px; margin-top: 12px; font-size: 11px; color: var(--ink-muted);
+    flex-wrap: wrap; justify-content: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 6px; }
+  .legend-swatch { width: 14px; height: 14px; border: 1px solid var(--line); }
+
+  .list { display: none; }
+  .list.active { display: block; }
+  .grid-wrap.hidden { display: none; }
+  .list-entry {
+    padding: 12px 10px; border-bottom: 1px solid var(--line); cursor: pointer;
+    display: grid; grid-template-columns: 56px 1fr auto; gap: 10px; align-items: center;
+  }
+  .list-entry:hover { background: var(--bg-2); }
+  .list-entry .rid { font-weight: 700; color: var(--accent); font-size: 15px; }
+  .list-entry .main { overflow: hidden; }
+  .list-entry .baum { font-weight: 500; font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-entry .meta { font-size: 11px; color: var(--ink-muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-entry .date { font-size: 11px; color: var(--ink-muted); text-align: right; white-space: nowrap; }
+  .list-empty { padding: 40px 20px; text-align: center; color: var(--ink-muted); font-style: italic; }
+
+  .overlay {
+    display: none; position: fixed; inset: 0; background: rgba(42, 33, 24, 0.55);
+    z-index: 100; align-items: flex-end; justify-content: center; animation: fadeIn 0.15s ease-out;
+  }
+  .overlay.open { display: flex; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal {
+    background: var(--bg); width: 100%; max-width: 520px; padding: 22px;
+    padding-bottom: calc(22px + var(--safe-bottom));
+    border-top: 3px solid var(--ink); animation: slideUp 0.22s cubic-bezier(0.2, 0, 0.2, 1);
+    max-height: 92vh; overflow-y: auto;
+  }
+  @media (min-width: 600px) {
+    .overlay { align-items: center; }
+    .modal { border: 3px solid var(--ink); padding-bottom: 22px; }
+  }
+  .modal-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--line);
+  }
+  .modal-head h2 { font-size: 26px; font-style: italic; }
+  .modal-head .coord { font-size: 11px; color: var(--ink-muted); letter-spacing: 0.1em; }
+
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--ink-muted); margin-bottom: 5px;
+  }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 11px 12px; font-family: inherit; font-size: 15px;
+    border: 1.5px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 0;
+  }
+  .field select {
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3e%3cpath fill='%236b5f4e' d='M2 4l4 4 4-4z'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+    cursor: pointer;
+  }
+  .field select optgroup {
+    font-weight: 700; font-style: italic; color: var(--accent);
+    background: var(--bg-2);
+  }
+  .field select option {
+    font-weight: 400; font-style: normal; color: var(--ink);
+    padding: 6px;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    outline: none; border-color: var(--accent); background: var(--bg-2);
+  }
+  .field textarea { resize: vertical; min-height: 70px; font-family: 'Fraunces', Georgia, serif; font-size: 15px; }
+
+  .modal-actions { display: flex; gap: 6px; margin-top: 18px; }
+  .modal-actions button { flex: 1; padding: 14px 10px; }
+  .modal-actions button.primary { flex: 2; }
+
+  /* ---------- Foto-Bereich ---------- */
+  .fotos-block { margin-top: 8px; }
+  .fotos-empty {
+    color: var(--ink-muted); font-size: 12px; padding: 10px;
+    background: var(--bg-2); border: 1px dashed var(--line); text-align: center;
+    font-style: italic;
+  }
+  .foto-slot {
+    display: grid;
+    grid-template-columns: 64px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px;
+    border: 1px solid var(--line);
+    background: var(--bg-2);
+    margin-bottom: 6px;
+  }
+  .foto-thumb {
+    width: 64px; height: 64px; object-fit: cover;
+    border: 1px solid var(--line); cursor: pointer;
+    background: var(--bg-3);
+  }
+  .foto-thumb.loading {
+    background: var(--bg-3) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='3' fill='%236b5f4e'/></svg>") center / 24px no-repeat;
+  }
+  .foto-info { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .foto-info input[type="date"] {
+    width: 100%; font-size: 12px; padding: 4px 6px;
+    border: 1px solid var(--line); background: var(--bg);
+    font-family: inherit;
+  }
+  .foto-info a {
+    font-size: 10px; color: var(--accent); text-decoration: underline;
+    word-break: break-all;
+  }
+  .foto-actions { display: flex; }
+  .foto-actions button {
+    padding: 6px 10px; font-size: 10px;
+    border-color: var(--warn); color: var(--warn); background: var(--bg);
+  }
+  .foto-actions button:hover { background: var(--warn); color: var(--bg); }
+  .foto-add-btn {
+    width: 100%; padding: 10px; margin-top: 6px;
+    border: 1.5px dashed var(--accent); color: var(--accent);
+    background: var(--bg); font-weight: 600;
+  }
+  .foto-add-btn:hover { background: var(--accent); color: var(--bg); border-style: solid; }
+  .foto-add-btn:disabled { opacity: 0.5; cursor: wait; }
+
+  .save-status {
+    font-size: 10px; color: var(--ink-muted); margin-top: 10px; text-align: center;
+    text-transform: uppercase; letter-spacing: 0.1em; min-height: 14px;
+  }
+  .save-status.ok { color: var(--sync-ok); }
+  .save-status.err { color: var(--sync-err); }
+
+  /* ---------- QR panel with 2 codes ---------- */
+  .qr-panel { text-align: center; }
+  .qr-duo {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+  .qr-card {
+    padding: 12px;
+    border: 1px solid var(--line);
+    background: var(--bg-2);
+  }
+  .qr-card h3 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-style: italic;
+    font-size: 18px;
+    margin-bottom: 8px;
+    color: var(--accent);
+  }
+  .qr-card img {
+    width: 100%;
+    max-width: 180px;
+    display: block;
+    margin: 0 auto;
+    background: white;
+    padding: 8px;
+  }
+  .qr-card .qr-url-mini {
+    font-size: 9px;
+    color: var(--ink-muted);
+    word-break: break-all;
+    margin-top: 8px;
+    line-height: 1.4;
+  }
+  @media (max-width: 420px) {
+    .qr-duo { grid-template-columns: 1fr; }
+  }
+
+  .banner {
+    background: var(--warn); color: var(--bg); padding: 10px 14px;
+    margin-bottom: 12px; font-size: 12px; line-height: 1.5; display: none;
+  }
+  .banner.open { display: block; }
+  .banner strong { display: block; font-weight: 700; margin-bottom: 4px; }
+
+  .install-banner {
+    display: none;
+    background: var(--accent-dark); color: var(--bg); padding: 10px 14px;
+    margin-bottom: 12px; font-size: 12px; align-items: center; gap: 10px;
+  }
+  .install-banner.open { display: flex; }
+  .install-banner strong { flex: 1; }
+  .install-banner button {
+    padding: 6px 10px; font-size: 10px; background: var(--bg); color: var(--accent-dark);
+    border-color: var(--bg);
+  }
+  .install-banner .close-x {
+    cursor: pointer; font-size: 18px; line-height: 1; padding: 4px 6px;
+    background: transparent; color: var(--bg); border: none;
+  }
+
+  .hint {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--ink); color: var(--bg);
+    padding: 8px 14px calc(8px + var(--safe-bottom));
+    font-size: 10px; text-align: center; letter-spacing: 0.05em;
+    text-transform: uppercase; border-top: 2px solid var(--accent);
+  }
+  .hint strong { color: var(--accent-2); }
+
+  @media (max-width: 480px) {
+    body { padding-left: 8px; padding-right: 8px; }
+    .toolbar button { padding: 8px 10px; font-size: 11px; }
+    .grid { grid-template-columns: 26px repeat(20, minmax(28px, 1fr)); }
+    .grid-rh { height: 28px; font-size: 9px; }
+    .cell { min-height: 28px; }
+    .cell .cid { font-size: 8px; }
+    .cell .cbaum { font-size: 8px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Beet-Tracker</h1>
+  <div class="subtitle">Skyseed · Raster 5,5 × 5,5 cm · 20 × 13 = 260 Felder · A1 hinten links</div>
+</header>
+
+<div class="install-banner" id="install-banner">
+  <strong>Als App installieren?</strong>
+  <button class="install" id="btn-install">Installieren</button>
+  <button class="close-x" onclick="dismissInstall()">×</button>
+</div>
+
+<div class="banner" id="banner"></div>
+
+<div class="beet-bar">
+  <button class="beet-tab active" data-beet="1">Beet 1</button>
+  <button class="beet-tab" data-beet="2">Beet 2</button>
+</div>
+
+<div class="sync-row">
+  <div class="stats"><strong id="stat-count">0</strong>/260 belegt · <span id="stat-last">lade…</span></div>
+  <div class="sync-status">
+    <span class="sync-dot wait" id="sync-dot"></span>
+    <span id="sync-label">lade…</span>
+  </div>
+</div>
+
+<div class="quick-bar">
+  <input type="text" id="quick-input" placeholder="Raster-ID · z. B. C5 oder M20 · Enter"
+    maxlength="3" inputmode="text" autocapitalize="characters" autocomplete="off" spellcheck="false">
+</div>
+
+<div class="toolbar">
+  <button class="primary" id="btn-view" onclick="toggleView()">Liste</button>
+  <button onclick="manualRefresh()">Sync jetzt</button>
+  <button onclick="exportCSV()">CSV</button>
+  <button onclick="showQR()">QR</button>
+</div>
+
+<div class="grid-wrap" id="grid-wrap">
+  <div class="grid" id="grid"></div>
+  <div class="legend">
+    <div class="legend-item"><span class="legend-swatch" style="background:var(--empty)"></span>leer</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:var(--filled);border-color:var(--filled-border)"></span>belegt</div>
+    <div class="legend-item"><span class="legend-swatch" style="background:var(--empty);box-shadow:inset 0 0 0 2px var(--warn)"></span>letzter</div>
+  </div>
+</div>
+
+<div class="list" id="list"></div>
+
+<!-- Modal Eintrag -->
+<div class="overlay" id="overlay" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="m-title">Feld</h2>
+      <span class="coord" id="m-sub">—</span>
+    </div>
+    <div class="field">
+      <label for="f-baumart">Baumart</label>
+      <select id="f-baumart">
+        <option value="">— auswählen —</option>
+        <optgroup label="Koniferen (A–Z)">
+          <option value="Douglasie (Pseudotsuga menziesii)">Douglasie (Pseudotsuga menziesii)</option>
+          <option value="Eibe (Taxus baccata)">Eibe (Taxus baccata)</option>
+          <option value="Europäische Lärche (Larix decidua)">Europäische Lärche (Larix decidua)</option>
+          <option value="Fichte (Picea abies)">Fichte (Picea abies)</option>
+          <option value="Japanische Lärche (Larix kaempferi)">Japanische Lärche (Larix kaempferi)</option>
+          <option value="Kiefer, Schwarz (Pinus nigra)">Kiefer, Schwarz (Pinus nigra)</option>
+          <option value="Kiefer, Wald (Pinus sylvestris)">Kiefer, Wald (Pinus sylvestris)</option>
+          <option value="Küstentanne (Abies grandis)">Küstentanne (Abies grandis)</option>
+          <option value="Nordmanntanne (Abies nordmanniana)">Nordmanntanne (Abies nordmanniana)</option>
+          <option value="Schwarzfichte (Picea mariana)">Schwarzfichte (Picea mariana)</option>
+          <option value="Sitkafichte (Picea sitchensis)">Sitkafichte (Picea sitchensis)</option>
+          <option value="Strobe (Pinus strobus)">Strobe (Pinus strobus)</option>
+          <option value="Weißtanne (Abies alba)">Weißtanne (Abies alba)</option>
+          <option value="Zirbelkiefer (Pinus cembra)">Zirbelkiefer (Pinus cembra)</option>
+        </optgroup>
+        <optgroup label="Laubholz (A–Z)">
+          <option value="Ahorn, Berg (Acer pseudoplatanus)">Ahorn, Berg (Acer pseudoplatanus)</option>
+          <option value="Ahorn, Feld (Acer campestre)">Ahorn, Feld (Acer campestre)</option>
+          <option value="Ahorn, Spitz (Acer platanoides)">Ahorn, Spitz (Acer platanoides)</option>
+          <option value="Birke, Hänge (Betula pendula)">Birke, Hänge (Betula pendula)</option>
+          <option value="Birke, Moor (Betula pubescens)">Birke, Moor (Betula pubescens)</option>
+          <option value="Buche, Rot (Fagus sylvatica)">Buche, Rot (Fagus sylvatica)</option>
+          <option value="Eiche, Rot (Quercus rubra)">Eiche, Rot (Quercus rubra)</option>
+          <option value="Eiche, Stiel (Quercus robur)">Eiche, Stiel (Quercus robur)</option>
+          <option value="Eiche, Trauben (Quercus petraea)">Eiche, Trauben (Quercus petraea)</option>
+          <option value="Elsbeere (Sorbus torminalis)">Elsbeere (Sorbus torminalis)</option>
+          <option value="Erle, Grau (Alnus incana)">Erle, Grau (Alnus incana)</option>
+          <option value="Erle, Schwarz (Alnus glutinosa)">Erle, Schwarz (Alnus glutinosa)</option>
+          <option value="Esche (Fraxinus excelsior)">Esche (Fraxinus excelsior)</option>
+          <option value="Espe (Populus tremula)">Espe (Populus tremula)</option>
+          <option value="Flatterulme (Ulmus laevis)">Flatterulme (Ulmus laevis)</option>
+          <option value="Hainbuche (Carpinus betulus)">Hainbuche (Carpinus betulus)</option>
+          <option value="Kastanie, Ess (Castanea sativa)">Kastanie, Ess (Castanea sativa)</option>
+          <option value="Kirsche, Vogel (Prunus avium)">Kirsche, Vogel (Prunus avium)</option>
+          <option value="Linde, Sommer (Tilia platyphyllos)">Linde, Sommer (Tilia platyphyllos)</option>
+          <option value="Linde, Winter (Tilia cordata)">Linde, Winter (Tilia cordata)</option>
+          <option value="Mehlbeere (Sorbus aria)">Mehlbeere (Sorbus aria)</option>
+          <option value="Nussbaum, Walnuss (Juglans regia)">Nussbaum, Walnuss (Juglans regia)</option>
+          <option value="Pappel, Schwarz (Populus nigra)">Pappel, Schwarz (Populus nigra)</option>
+          <option value="Robinie (Robinia pseudoacacia)">Robinie (Robinia pseudoacacia)</option>
+          <option value="Speierling (Sorbus domestica)">Speierling (Sorbus domestica)</option>
+          <option value="Ulme, Berg (Ulmus glabra)">Ulme, Berg (Ulmus glabra)</option>
+          <option value="Vogelbeere / Eberesche (Sorbus aucuparia)">Vogelbeere / Eberesche (Sorbus aucuparia)</option>
+          <option value="Weide, Sal (Salix caprea)">Weide, Sal (Salix caprea)</option>
+          <option value="Wildapfel (Malus sylvestris)">Wildapfel (Malus sylvestris)</option>
+          <option value="Wildbirne (Pyrus pyraster)">Wildbirne (Pyrus pyraster)</option>
+          <option value="Winterlinde siehe Linde, Winter" disabled></option>
+        </optgroup>
+        <optgroup label="Sonstiges">
+          <option value="Andere / Freitext">Andere (bitte im Kommentar präzisieren)</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="field">
+      <label for="f-posten">Postennummer</label>
+      <input type="text" id="f-posten" placeholder="z. B. Ch-2026-017" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="f-datum">Datum Aussaat</label>
+      <input type="date" id="f-datum">
+    </div>
+    <div class="field">
+      <label for="f-kommentar">Kommentar</label>
+      <textarea id="f-kommentar" placeholder="Pillierung, Behandlung, Beobachtungen …"></textarea>
+    </div>
+    <div class="field">
+      <label>Fotos</label>
+      <div class="fotos-block" id="fotos-block"></div>
+      <input type="file" id="foto-file-input" accept="image/*" capture="environment" style="display:none">
+      <button class="foto-add-btn" id="foto-add-btn" onclick="addFoto()">+ Foto hinzufügen</button>
+    </div>
+    <div class="save-status" id="save-status"></div>
+    <div class="modal-actions">
+      <button class="danger" onclick="deleteEntry()">Löschen</button>
+      <button onclick="closeModal()">Schließen</button>
+      <button class="primary" onclick="saveEntry()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal QR · zwei Codes -->
+<div class="overlay" id="qr-overlay" onclick="if(event.target===this)closeQR()">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>QR-Codes</h2>
+      <span class="coord">pro Beet</span>
+    </div>
+    <div class="qr-panel">
+      <p style="font-size:12px;color:var(--ink-muted);margin-bottom:8px;line-height:1.5">
+        Beim Scannen öffnet sich die App direkt mit dem jeweiligen Beet.
+      </p>
+      <div class="qr-duo">
+        <div class="qr-card">
+          <h3>Beet 1</h3>
+          <img id="qr-img-1" src="" alt="QR-Code Beet 1">
+          <div class="qr-url-mini" id="qr-url-1"></div>
+        </div>
+        <div class="qr-card">
+          <h3>Beet 2</h3>
+          <img id="qr-img-2" src="" alt="QR-Code Beet 2">
+          <div class="qr-url-mini" id="qr-url-2"></div>
+        </div>
+      </div>
+      <p style="font-size:11px;color:var(--ink-muted);margin-top:12px;line-height:1.5">
+        Tipp: QR-Codes ausdrucken, laminieren und je einen am entsprechenden Beet anbringen.
+      </p>
+    </div>
+    <div class="modal-actions"><button class="primary" onclick="closeQR()">Schließen</button></div>
+  </div>
+</div>
+
+<div class="hint">
+  <strong>Schnell-Eintrag:</strong> Raster-ID tippen + Enter · Auto-Sync alle 15 s
+</div>
+
+<script>
+  // ========== KONFIGURATION ==========
+  const API_URL = 'https://script.google.com/macros/s/AKfycbwilUzeaIPDgjLwDr5bICOKOHnneXWml9s9Ms7C47rV4kjuL-LYFP9H4lGXdeUUn05vug/exec';
+  // ===================================
+
+  const ROWS = 'ABCDEFGHIJKLM'.split('');
+  const COLS = 20;
+  const POLL_INTERVAL = 15000;
+  const LOCAL_PREF_KEY = 'beet-tracker-pref';
+
+  let currentBeet = '1';
+  let entries = {};
+  let lastTouched = null;
+  let currentId = null;
+  let pollTimer = null;
+  let pendingSave = false;
+  let deferredInstallPrompt = null;
+
+  function setSyncState(state, label) {
+    const dot = document.getElementById('sync-dot');
+    dot.className = 'sync-dot' + (state === 'wait' ? ' wait' : state === 'err' ? ' err' : '');
+    document.getElementById('sync-label').textContent = label;
+  }
+  function showBanner(title, msg) {
+    const b = document.getElementById('banner');
+    b.innerHTML = '<strong>' + escHTML(title) + '</strong>' + escHTML(msg);
+    b.classList.add('open');
+  }
+  function hideBanner() { document.getElementById('banner').classList.remove('open'); }
+  function escHTML(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+  function savePref() {
+    try { localStorage.setItem(LOCAL_PREF_KEY, JSON.stringify({ beet: currentBeet })); } catch (e) {}
+  }
+  function loadPref() {
+    // URL-Parameter hat Vorrang vor localStorage, damit QR-Codes direkt das
+    // richtige Beet oeffnen. ?beet=1 oder ?beet=2
+    try {
+      const urlBeet = new URLSearchParams(window.location.search).get('beet');
+      if (urlBeet === '1' || urlBeet === '2') {
+        currentBeet = urlBeet;
+        savePref();
+        return;
+      }
+      const raw = localStorage.getItem(LOCAL_PREF_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (p.beet === '1' || p.beet === '2') currentBeet = p.beet;
+      }
+    } catch (e) {}
+  }
+
+  async function apiGet(beet) {
+    const url = API_URL + '?beet=' + encodeURIComponent(beet) + '&_=' + Date.now();
+    const r = await fetch(url, { method: 'GET' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  }
+  async function apiPost(payload) {
+    const r = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    return data;
+  }
+
+  async function loadBeet(beet, silent = false) {
+    if (!silent) setSyncState('wait', 'lade…');
+    try {
+      const data = await apiGet(beet);
+      if (beet !== currentBeet) return;
+      entries = data.entries || {};
+      render();
+      setSyncState('ok', 'sync ' + new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }));
+      hideBanner();
+    } catch (e) {
+      setSyncState('err', navigator.onLine ? 'Fehler' : 'offline');
+      if (!silent) showBanner(navigator.onLine ? 'Keine Verbindung zum Server' : 'Offline',
+        navigator.onLine ? 'Prüfe die Apps-Script-URL. Details: ' + e.message
+                         : 'Einträge sind lesbar (letzter Stand), Speichern erst wieder online möglich.');
+    }
+  }
+
+  async function pushEntry(id, data) {
+    pendingSave = true;
+    setSyncState('wait', 'speichere…');
+    try {
+      const res = await apiPost({ beet: currentBeet, action: 'upsert', id, ...data });
+      entries[id] = { ...data, fotos: data.fotos || [], updated: res.updated || new Date().toISOString() };
+      lastTouched = id;
+      setSyncState('ok', 'gespeichert');
+      pendingSave = false;
+      render();
+      return true;
+    } catch (e) {
+      setSyncState('err', 'Fehler');
+      showBanner('Speichern fehlgeschlagen', e.message);
+      pendingSave = false;
+      return false;
+    }
+  }
+
+  async function pushDelete(id) {
+    pendingSave = true;
+    setSyncState('wait', 'lösche…');
+    try {
+      await apiPost({ beet: currentBeet, action: 'delete', id });
+      delete entries[id];
+      if (lastTouched === id) lastTouched = null;
+      setSyncState('ok', 'gelöscht');
+      pendingSave = false;
+      render();
+      return true;
+    } catch (e) {
+      setSyncState('err', 'Fehler');
+      showBanner('Löschen fehlgeschlagen', e.message);
+      pendingSave = false;
+      return false;
+    }
+  }
+
+  function render() { renderGrid(); renderStats(); renderList(); }
+
+  function renderGrid() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    const corner = document.createElement('div');
+    corner.className = 'grid-corner';
+    grid.appendChild(corner);
+    for (let c = 1; c <= COLS; c++) {
+      const h = document.createElement('div');
+      h.className = 'grid-ch' + (c % 5 === 0 ? ' fifth' : '');
+      h.textContent = c;
+      grid.appendChild(h);
+    }
+    for (const row of ROWS) {
+      const lbl = document.createElement('div');
+      const isFifth = (ROWS.indexOf(row) + 1) % 5 === 0;
+      lbl.className = 'grid-rh' + (isFifth ? ' fifth' : '');
+      lbl.textContent = row;
+      grid.appendChild(lbl);
+      for (let c = 1; c <= COLS; c++) {
+        const id = row + c;
+        const cell = document.createElement('div');
+        const e = entries[id];
+        cell.className = 'cell' + (e ? ' filled' : '') + (id === lastTouched ? ' recent' : '');
+        // Schachbrett-Muster: alternierende Hintergrundfarbe für visuelle Orientierung
+        if ((ROWS.indexOf(row) + c) % 2 === 0) cell.classList.add('alt');
+        const cid = document.createElement('div');
+        cid.className = 'cid';
+        cid.textContent = id;
+        cell.appendChild(cid);
+        if (e && e.baumart) {
+          const cb = document.createElement('div');
+          cb.className = 'cbaum';
+          // Zeige den ersten Teil des Namens vor dem Lateinischen Namen,
+          // z.B. "Fichte" statt "Fichte (Picea abies)"
+          const short = e.baumart.split('(')[0].trim();
+          cb.textContent = short.length > 4 ? short.slice(0, 4) + '…' : short;
+          cell.appendChild(cb);
+        }
+        // Foto-Indikator: kleiner Punkt rechts oben wenn Fotos vorhanden
+        if (e && e.fotos && e.fotos.length > 0) {
+          const fi = document.createElement('div');
+          fi.className = 'foto-indicator';
+          fi.textContent = e.fotos.length;
+          cell.appendChild(fi);
+        }
+        cell.title = id + (e ? ' · ' + (e.baumart || '—') + (e.datum ? ' · ' + e.datum : '') : '');
+        cell.addEventListener('click', () => openModal(id));
+        grid.appendChild(cell);
+      }
+    }
+  }
+
+  function renderStats() {
+    document.getElementById('stat-count').textContent = Object.keys(entries).length;
+    const sorted = Object.entries(entries).sort((a, b) => (b[1].datum || '').localeCompare(a[1].datum || ''));
+    const last = sorted[0];
+    document.getElementById('stat-last').textContent = last
+      ? 'letzter: ' + last[0] + (last[1].datum ? ' · ' + last[1].datum : '')
+      : 'keine Einträge';
+  }
+
+  function renderFotosList() {
+    const block = document.getElementById('fotos-block');
+    if (!currentId) return;
+    const e = entries[currentId] || {};
+    const fotos = (e.fotos || []);
+    if (fotos.length === 0) {
+      block.innerHTML = '<div class="fotos-empty">Noch keine Fotos für ' + currentId + '</div>';
+      return;
+    }
+    block.innerHTML = fotos.map((foto, idx) => {
+      const datum = foto.datum || '';
+      const thumb = foto.thumbnailUrl || foto.url || '';
+      const link = foto.url || '#';
+      return '<div class="foto-slot">' +
+        '<img class="foto-thumb" src="' + escAttr(thumb) + '" ' +
+          'alt="Foto vom ' + escAttr(datum) + '" ' +
+          'onclick="window.open(\'' + escAttr(link) + '\', \'_blank\')" ' +
+          'onerror="this.classList.add(\'loading\');this.removeAttribute(\'src\')">' +
+        '<div class="foto-info">' +
+          '<input type="date" value="' + escAttr(datum) + '" ' +
+            'onchange="updateFotoDate(' + idx + ', this.value)">' +
+          '<a href="' + escAttr(link) + '" target="_blank" rel="noopener">In Drive öffnen</a>' +
+        '</div>' +
+        '<div class="foto-actions">' +
+          '<button onclick="deleteFotoAt(' + idx + ')">Löschen</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function escAttr(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        const base64 = String(dataUrl).split(',')[1] || '';
+        resolve(base64);
+      };
+      reader.onerror = () => reject(new Error('FileReader failed'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function addFoto() {
+    if (!currentId) return;
+    const fileInput = document.getElementById('foto-file-input');
+    const addBtn = document.getElementById('foto-add-btn');
+
+    fileInput.onchange = async (ev) => {
+      const file = ev.target.files && ev.target.files[0];
+      fileInput.value = '';
+      if (!file) return;
+
+      // Größenwarnung: Apps Script POST-Limit ~50MB nach Base64-Aufschlag
+      // Bei > 8 MB Originalbild kann es eng werden, deshalb Hinweis.
+      if (file.size > 8 * 1024 * 1024) {
+        if (!confirm('Foto ist ' + Math.round(file.size / 1024 / 1024) + ' MB groß. Upload kann mehrere Sekunden dauern. Trotzdem hochladen?')) return;
+      }
+
+      addBtn.disabled = true;
+      addBtn.textContent = 'Lädt hoch …';
+      setSyncState('wait', 'Foto-Upload…');
+
+      try {
+        const base64 = await fileToBase64(file);
+        const today = new Date().toISOString().slice(0, 10);
+        const res = await apiPost({
+          beet: currentBeet,
+          action: 'uploadFoto',
+          id: currentId,
+          datum: today,
+          fileBase64: base64,
+          mimeType: file.type || 'image/jpeg'
+        });
+
+        // Lokales Eintrag-Objekt erweitern
+        if (!entries[currentId]) entries[currentId] = { baumart: '', posten: '', datum: '', kommentar: '', fotos: [] };
+        if (!entries[currentId].fotos) entries[currentId].fotos = [];
+        entries[currentId].fotos.push({
+          datum: res.datum || today,
+          fileId: res.fileId,
+          url: res.url,
+          thumbnailUrl: res.thumbnailUrl
+        });
+
+        // Persistieren: Einen upsert mit aktuellem Foto-Array senden,
+        // damit die Sheet-Zeile auch dann das Foto referenziert, wenn der
+        // User das Modal schließt, ohne nochmal "Speichern" zu drücken.
+        await persistCurrentFotos();
+
+        renderFotosList();
+        renderGrid();
+        setSyncState('ok', 'Foto gespeichert');
+      } catch (err) {
+        setSyncState('err', 'Upload-Fehler');
+        showBanner('Foto-Upload fehlgeschlagen', String(err.message || err));
+      } finally {
+        addBtn.disabled = false;
+        addBtn.textContent = '+ Foto hinzufügen';
+      }
+    };
+    fileInput.click();
+  }
+
+  async function deleteFotoAt(idx) {
+    if (!currentId) return;
+    const e = entries[currentId];
+    if (!e || !e.fotos || !e.fotos[idx]) return;
+    if (!confirm('Foto vom ' + (e.fotos[idx].datum || '?') + ' wirklich löschen?')) return;
+
+    setSyncState('wait', 'Lösche Foto…');
+    const fileId = e.fotos[idx].fileId;
+    try {
+      if (fileId) {
+        await apiPost({ action: 'deleteFoto', fileId: fileId });
+      }
+      e.fotos.splice(idx, 1);
+      await persistCurrentFotos();
+      renderFotosList();
+      renderGrid();
+      setSyncState('ok', 'Foto gelöscht');
+    } catch (err) {
+      setSyncState('err', 'Lösch-Fehler');
+      showBanner('Foto löschen fehlgeschlagen', String(err.message || err));
+    }
+  }
+
+  async function updateFotoDate(idx, newDate) {
+    if (!currentId) return;
+    const e = entries[currentId];
+    if (!e || !e.fotos || !e.fotos[idx]) return;
+    e.fotos[idx].datum = newDate;
+    setSyncState('wait', 'Datum speichern…');
+    try {
+      await persistCurrentFotos();
+      setSyncState('ok', 'Datum aktualisiert');
+    } catch (err) {
+      setSyncState('err', 'Fehler');
+    }
+  }
+
+  // Hilfsfunktion: Aktuelles Eintrag-Objekt an Apps Script senden, mit aktuellem Foto-Array.
+  // Liest dabei die Formularfelder, falls Modal noch offen, sonst Werte aus entries[].
+  async function persistCurrentFotos() {
+    if (!currentId) return;
+    const e = entries[currentId] || {};
+    const sel = document.getElementById('f-baumart');
+    const baumart = (sel && sel.value && sel.value.trim()) || e.baumart || '';
+    const posten = (document.getElementById('f-posten').value || '').trim() || e.posten || '';
+    const datum = document.getElementById('f-datum').value || e.datum || '';
+    const kommentar = (document.getElementById('f-kommentar').value || '').trim() || e.kommentar || '';
+
+    await apiPost({
+      beet: currentBeet,
+      action: 'upsert',
+      id: currentId,
+      baumart: baumart,
+      posten: posten,
+      datum: datum,
+      kommentar: kommentar,
+      fotos: e.fotos || []
+    });
+    // Lokales entries[] aktuell halten, damit Sync-Polling nicht überschreibt
+    entries[currentId] = {
+      baumart, posten, datum, kommentar,
+      fotos: e.fotos || [],
+      updated: new Date().toISOString()
+    };
+    lastTouched = currentId;
+  }
+
+  function renderList() {
+    const lv = document.getElementById('list');
+    const sorted = Object.entries(entries).sort((a, b) => (b[1].datum || '').localeCompare(a[1].datum || ''));
+    if (sorted.length === 0) {
+      lv.innerHTML = '<div class="list-empty">Noch keine Einträge.</div>';
+      return;
+    }
+    lv.innerHTML = sorted.map(([id, e]) => `
+      <div class="list-entry" data-id="${id}">
+        <div class="rid">${id}</div>
+        <div class="main">
+          <div class="baum">${escHTML(e.baumart) || '—'}</div>
+          <div class="meta">${escHTML(e.posten || '')}${e.kommentar ? ' · ' + escHTML(e.kommentar).slice(0, 80) : ''}</div>
+        </div>
+        <div class="date">${e.datum || ''}</div>
+      </div>`).join('');
+    lv.querySelectorAll('.list-entry').forEach(el => {
+      el.addEventListener('click', () => openModal(el.dataset.id));
+    });
+  }
+
+  function openModal(id) {
+    currentId = id;
+    document.getElementById('m-title').textContent = 'Feld ' + id;
+    document.getElementById('m-sub').textContent = 'Beet ' + currentBeet + ' · ' + id;
+    const e = entries[id] || {};
+
+    // Dropdown fuellen: falls Wert aus der Liste, einfach setzen
+    const sel = document.getElementById('f-baumart');
+    const savedValue = e.baumart || '';
+    // Pruefen ob der gespeicherte Wert als option existiert
+    let found = false;
+    for (const opt of sel.options) {
+      if (opt.value === savedValue) { found = true; break; }
+    }
+    if (!found && savedValue) {
+      // Alter / Freitext-Wert: als temporaere Option eintragen
+      const tmp = document.createElement('option');
+      tmp.value = savedValue;
+      tmp.textContent = savedValue + '  (alt)';
+      tmp.dataset.temp = '1';
+      sel.appendChild(tmp);
+    }
+    sel.value = savedValue;
+
+    document.getElementById('f-posten').value = e.posten || '';
+    document.getElementById('f-datum').value = e.datum || new Date().toISOString().slice(0, 10);
+    document.getElementById('f-kommentar').value = e.kommentar || '';
+    document.getElementById('save-status').textContent = '';
+    document.getElementById('save-status').className = 'save-status';
+
+    // Foto-Liste rendern (nutzt entries[currentId].fotos)
+    renderFotosList();
+
+    document.getElementById('overlay').classList.add('open');
+  }
+
+  function closeModal() {
+    document.getElementById('overlay').classList.remove('open');
+    currentId = null;
+    // Temporaere Optionen entfernen
+    const sel = document.getElementById('f-baumart');
+    [...sel.options].forEach(o => { if (o.dataset.temp) sel.removeChild(o); });
+  }
+
+  async function saveEntry() {
+    if (!currentId) return;
+    const existingFotos = (entries[currentId] && entries[currentId].fotos) || [];
+    const data = {
+      baumart:   document.getElementById('f-baumart').value.trim(),
+      posten:    document.getElementById('f-posten').value.trim(),
+      datum:     document.getElementById('f-datum').value,
+      kommentar: document.getElementById('f-kommentar').value.trim(),
+      fotos:     existingFotos
+    };
+    const status = document.getElementById('save-status');
+    if (!data.baumart && !data.posten && !data.kommentar && data.fotos.length === 0) {
+      if (entries[currentId]) {
+        status.textContent = 'lösche…';
+        const ok = await pushDelete(currentId);
+        if (ok) closeModal();
+        else { status.textContent = 'Fehler'; status.className = 'save-status err'; }
+      } else closeModal();
+      return;
+    }
+    status.textContent = 'speichere…';
+    status.className = 'save-status';
+    const ok = await pushEntry(currentId, data);
+    if (ok) {
+      status.textContent = 'gespeichert ✓';
+      status.className = 'save-status ok';
+      setTimeout(() => closeModal(), 400);
+    } else {
+      status.textContent = 'Fehler – erneut versuchen';
+      status.className = 'save-status err';
+    }
+  }
+
+  async function deleteEntry() {
+    if (!currentId) return;
+    if (!entries[currentId]) { closeModal(); return; }
+    if (!confirm('Eintrag ' + currentId + ' im Beet ' + currentBeet + ' wirklich löschen?')) return;
+    const ok = await pushDelete(currentId);
+    if (ok) closeModal();
+  }
+
+  function toggleView() {
+    const grid = document.getElementById('grid-wrap');
+    const list = document.getElementById('list');
+    const btn = document.getElementById('btn-view');
+    if (list.classList.contains('active')) {
+      list.classList.remove('active'); grid.classList.remove('hidden'); btn.textContent = 'Liste';
+    } else {
+      list.classList.add('active'); grid.classList.add('hidden'); btn.textContent = 'Raster';
+    }
+  }
+
+  document.querySelectorAll('.beet-tab').forEach(tab => {
+    tab.addEventListener('click', async () => {
+      const beet = tab.dataset.beet;
+      if (beet === currentBeet) return;
+      currentBeet = beet;
+      document.querySelectorAll('.beet-tab').forEach(t => t.classList.toggle('active', t.dataset.beet === beet));
+      savePref();
+      lastTouched = null;
+      entries = {};
+      render();
+      await loadBeet(beet);
+    });
+  });
+
+  const qi = document.getElementById('quick-input');
+  qi.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      const val = qi.value.trim().toUpperCase();
+      if (/^[A-M]([1-9]|1[0-9]|20)$/.test(val)) {
+        qi.classList.remove('invalid'); qi.value = ''; openModal(val);
+      } else {
+        qi.classList.add('invalid');
+        setTimeout(() => qi.classList.remove('invalid'), 800);
+      }
+    }
+  });
+
+  async function manualRefresh() { await loadBeet(currentBeet); }
+
+  function exportCSV() {
+    if (Object.keys(entries).length === 0) { alert('Keine Einträge zum Exportieren.'); return; }
+    const header = ['Beet', 'Raster-ID', 'Baumart', 'Postennummer', 'Datum Aussaat', 'Kommentar', 'Updated'];
+    const esc = s => '"' + String(s || '').replace(/"/g, '""') + '"';
+    const sorted = Object.entries(entries).sort((a, b) => a[0].localeCompare(b[0]));
+    const rows = sorted.map(([id, e]) => [
+      currentBeet, id, esc(e.baumart), esc(e.posten), e.datum || '', esc(e.kommentar), e.updated || ''
+    ].join(','));
+    const csv = '\ufeff' + header.join(',') + '\n' + rows.join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'beet-' + currentBeet + '-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function buildBeetUrl(beetNr) {
+    const base = window.location.origin + window.location.pathname;
+    return base + '?beet=' + beetNr;
+  }
+
+  function showQR() {
+    const url = window.location.href;
+    const isLocal = /^(file:|data:)/.test(url) || url.includes('localhost');
+    const elements = [
+      { nr: '1', img: 'qr-img-1', urlEl: 'qr-url-1' },
+      { nr: '2', img: 'qr-img-2', urlEl: 'qr-url-2' }
+    ];
+    if (isLocal) {
+      elements.forEach(el => {
+        document.getElementById(el.img).removeAttribute('src');
+        document.getElementById(el.urlEl).innerHTML =
+          '<strong style="color:var(--warn)">Lokal geöffnet – nur bei gehosteter URL sinnvoll.</strong>';
+      });
+    } else {
+      elements.forEach(el => {
+        const beetUrl = buildBeetUrl(el.nr);
+        document.getElementById(el.img).src =
+          'https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=10&data=' + encodeURIComponent(beetUrl);
+        document.getElementById(el.urlEl).textContent = beetUrl;
+      });
+    }
+    document.getElementById('qr-overlay').classList.add('open');
+  }
+  function closeQR() { document.getElementById('qr-overlay').classList.remove('open'); }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (document.getElementById('overlay').classList.contains('open')) closeModal();
+      if (document.getElementById('qr-overlay').classList.contains('open')) closeQR();
+    }
+  });
+
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(async () => {
+      if (pendingSave || currentId !== null) return;
+      if (!navigator.onLine) return;
+      await loadBeet(currentBeet, true);
+    }, POLL_INTERVAL);
+  }
+
+  // ========== PWA Install ==========
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const dismissed = localStorage.getItem('install-dismissed');
+    if (!dismissed) document.getElementById('install-banner').classList.add('open');
+  });
+
+  document.getElementById('btn-install').addEventListener('click', async () => {
+    if (!deferredInstallPrompt) return;
+    deferredInstallPrompt.prompt();
+    const { outcome } = await deferredInstallPrompt.userChoice;
+    if (outcome === 'accepted') document.getElementById('install-banner').classList.remove('open');
+    deferredInstallPrompt = null;
+  });
+
+  function dismissInstall() {
+    document.getElementById('install-banner').classList.remove('open');
+    localStorage.setItem('install-dismissed', '1');
+  }
+
+  window.addEventListener('appinstalled', () => {
+    document.getElementById('install-banner').classList.remove('open');
+    deferredInstallPrompt = null;
+  });
+
+  // ========== Service Worker ==========
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./service-worker.js').catch(err => {
+        console.warn('SW registration failed:', err);
+      });
+    });
+  }
+
+  window.addEventListener('online', () => { hideBanner(); loadBeet(currentBeet); });
+  window.addEventListener('offline', () => setSyncState('err', 'offline'));
+
+  async function init() {
+    if (API_URL.startsWith('__') || API_URL === '' || !/^https?:\/\//.test(API_URL)) {
+      setSyncState('err', 'nicht konfiguriert');
+      showBanner('API nicht konfiguriert',
+        'Die Apps-Script-Webapp-URL fehlt. In der HTML-Datei oben im <script>-Block die Zeile const API_URL = ... mit deiner Webapp-URL ersetzen.');
+      render();
+      return;
+    }
+    loadPref();
+    document.querySelectorAll('.beet-tab').forEach(t => t.classList.toggle('active', t.dataset.beet === currentBeet));
+    await loadBeet(currentBeet);
+    startPolling();
+  }
+
+  init();
+</script>
+</body>
+</html>

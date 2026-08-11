@@ -1,0 +1,22 @@
+# Betriebssystem
+Thumbs.db
+Desktop.ini
+.DS_Store
+$RECYCLE.BIN/
+
+# Editoren
+.vscode/
+.idea/
+*.swp
+*~
+
+# Netlify
+.netlify/
+
+# Lokale Konfiguration und Secrets
+.env
+.env.*
+*.local
+
+# CSV-Exporte, die die App erzeugt (Feld-Daten, gehören nicht ins Repo)
+beet-*.csv
