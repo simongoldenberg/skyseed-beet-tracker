@@ -76,18 +76,15 @@ Vollständige Schritt-für-Schritt-Anleitung steht im Kopfkommentar von
 6. Für wöchentliche Backups einen Zeit-Trigger auf `weeklyBackup` einrichten (Sonntag, 3–4 Uhr).
    Backups bleiben 8 Wochen erhalten, ältere werden automatisch entfernt.
 
-> [!IMPORTANT]
-> `apps-script.gs` in diesem Repo ist eine **Referenz-Implementierung**, abgeleitet aus dem
-> API-Vertrag, den die App tatsächlich nutzt (`upsert` / `delete` / `uploadFoto` /
-> `deleteFoto`). Läuft bereits ein Deployment hinter der aktuellen `API_URL`, dieses hier
-> **nicht blind drüberkopieren** — dessen Quellcode ist über HTTP nicht einsehbar und könnte
-> ein anderes Sheet-Layout oder andere Foto-Ablage verwenden. Vorher im Apps-Script-Editor
-> vergleichen.
+> [!NOTE]
+> `apps-script.gs` ist der tatsächlich produktiv laufende Backend-Code, ergänzt um eine
+> Schreibsperre (`LockService`) gegen gleichzeitige Konflikt-Schreibvorgänge — das ist die
+> einzige bewusste Abweichung vom Original.
 
 ### Spalten im Google Sheet
 
-`Raster-ID` · `Baumart` · `Postennummer` · `Datum` · `Kommentar` · `Fotos` (JSON-Array) ·
-`Updated`
+`Raster-ID` · `Baumart` · `Postennummer` · `Datum` · `Kommentar` · `Updated` ·
+`Fotos` (JSON-Array)
 
 Die Reihenfolge ist bindend — `doGet` liest die Spalten positionsbasiert.
 

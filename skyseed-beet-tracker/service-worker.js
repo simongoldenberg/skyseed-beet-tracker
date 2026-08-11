@@ -4,7 +4,7 @@
 // - Bei Offline: letzte bekannte Daten zeigen
 // - Cache-Version bei jedem Update bumpen, damit alte HTML weicht!
 
-const CACHE_VERSION = 'skyseed-beet-v4';
+const CACHE_VERSION = 'skyseed-beet-v5';
 const STATIC_CACHE = [
   './',
   './index.html',

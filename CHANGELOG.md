@@ -2,6 +2,38 @@
 
 Alle nennenswerten Änderungen am Skyseed Beet-Tracker.
 
+## Version 3.0.1 — 2026-08-11
+
+Ersetzt die in v3.0.0 als „Referenz-Implementierung" gekennzeichnete `apps-script.gs` durch den
+tatsächlich produktiv laufenden Backend-Code — direkt aus einem zweiten, unabhängigen Export
+bereitgestellt. Behebt dabei mehrere Abweichungen, die bei einer frischen Bereitstellung der
+v3.0.0-Datei gegen das echte Sheet zu falschen Daten geführt hätten.
+
+### 🐛 Fixed
+- **Sheet-Spaltenreihenfolge korrigiert:** `Updated` steht vor `Fotos`, nicht danach. Die
+  v3.0.0-Fassung hätte beim echten, bereits produktiv befüllten Sheet die beiden Spalten
+  positionsbasiert vertauscht ausgelesen.
+- **Löschen eines Feldes löscht jetzt auch dessen Drive-Fotos.** Bisher blieben verwaiste
+  Foto-Dateien im Drive-Ordner zurück.
+- **Fotos liegen in Unterordnern je Beet** (`Skyseed Beet-Tracker Fotos/Beet 1` bzw.
+  `/Beet 2`) statt in einem einzigen gemeinsamen Ordner.
+- Backup-Pruning entfernt — das produktive Backend behält Backups bewusst dauerhaft
+  (Foto-Referenzen müssen erhalten bleiben), v3.0.0 hätte sie nach 8 Wochen gelöscht.
+
+### 🚀 Added
+- Migrationslogik: fehlt einem bestehenden Sheet die „Fotos"-Spalte, wird sie automatisch
+  ergänzt (v2 → v3-Upgrade eines schon befüllten Sheets).
+- `selfTest()` und `showFotoFolderLink()` als Diagnose-Funktionen, direkt aus dem
+  Apps-Script-Editor ausführbar.
+- Fehlermeldungen enthalten jetzt den Stacktrace (`err.stack`).
+
+### 🔄 Changed
+- `apps-script.gs` gilt nicht mehr als unverifizierte Referenz-Implementierung, sondern als
+  verifizierter Produktivcode plus einer einzigen bewussten Ergänzung: einer Schreibsperre
+  (`LockService`) um `upsert`/`delete`, die im beobachteten Original fehlt. Foto-Aktionen
+  bleiben ohne Sperre, damit ein langsamer Upload keine parallelen Sheet-Schreibvorgänge
+  blockiert.
+
 ## Version 3.0.0 — 2026-08-11
 
 **[BREAKING]** Ersetzt die in v2.0.0 unter Versionskontrolle gebrachte Version vollständig durch

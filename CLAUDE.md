@@ -26,10 +26,10 @@ Diese Punkte sind bewusst so und sollten nicht ohne Rücksprache aufgeweicht wer
 - **Deployment = Dateien kopieren.** Ein GitHub-Actions-Workflow lädt `skyseed-beet-tracker/`
   unverändert als Pages-Artefakt hoch — keine Build-Pipeline, kein Kompilierschritt.
 - **Backend ist Google Apps Script.** `apps-script.gs` wird nicht deployt, sondern manuell in
-  den Apps-Script-Editor des Google Sheets eingefügt (siehe Kopfkommentar in der Datei). Es ist
-  eine **Referenz-Implementierung**, die zum Vertrag der Frontend-Aktionen passt
-  (`upsert` / `delete` / `uploadFoto` / `deleteFoto`) — vor dem Überschreiben eines bereits
-  laufenden Deployments unbedingt mit dessen Code abgleichen.
+  den Apps-Script-Editor des Google Sheets eingefügt (siehe Kopfkommentar in der Datei). Der
+  Code ist der tatsächlich produktiv laufende Stand (verifiziert über einen direkten
+  Netlify-Deploy-Export), ergänzt um eine Schreibsperre (`LockService`) — das ist die einzige
+  bewusste Abweichung vom Original.
 - **Kein Auth.** Das Apps-Script-Webapp läuft mit Zugriff „Jeder, ohne Anmeldung". Wer die URL
   kennt, kann das Sheet lesen und schreiben. Deshalb ist das Repo privat.
 - **Relative Pfade.** Manifest, Icons und Service Worker werden relativ (`./`) eingebunden,
@@ -100,11 +100,11 @@ Die App liegt danach voraussichtlich unter einem Unterpfad
 wie bei Netlify. Alle Pfade in `index.html`/`manifest.json`/`service-worker.js` sind relativ,
 das funktioniert unter einem Unterpfad ohne Anpassung.
 
-## Bekannte Baustelle: Fotos ohne Backend-Verifikation
+## Fotos: Ablage in Google Drive
 
-`apps-script.gs` implementiert die Aktionen `uploadFoto` und `deleteFoto` (Ablage in einem
-Drive-Ordner „Skyseed Beet-Tracker Fotos", Freigabe „Jeder mit Link"), abgeleitet aus dem
-Vertrag, den `index.html` an die API stellt. Das ist **nicht** gegen den tatsächlich hinter der
-aktuellen `API_URL` laufenden Code getestet — dessen Quellcode ist über HTTP nicht einsehbar.
-Vor einem Redeploy dieser Datei über ein bereits produktiv laufendes Script: im Apps-Script-
-Editor vergleichen.
+`apps-script.gs` implementiert `uploadFoto`/`deleteFoto` wie im tatsächlich produktiv
+laufenden Backend: Fotos liegen unter einem Root-Ordner „Skyseed Beet-Tracker Fotos" in
+Unterordnern je Beet („Beet 1" / „Beet 2"), Freigabe „Jeder mit Link" (sonst kann der
+`<img>`-Tag im Browser das Thumbnail nicht ohne Google-Anmeldung laden). Löschen eines Feldes
+räumt die zugehörigen Drive-Dateien mit ab. Backups werden **bewusst nicht** automatisch
+gelöscht (siehe Kopfkommentar in `apps-script.gs`) — das ist Absicht, kein Nachholbedarf.
